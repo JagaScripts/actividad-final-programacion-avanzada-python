@@ -6,7 +6,7 @@ from app.models.cart_model import CartItem
 from app.models.user_model import User
 from app.models.product_model import Product
 from app.models.dec_base import DecBase
-from app.core.database import SessionLocal, engine
+from app.core.database import SessionLocal, engine, get_db
 
 # Constantes para la Fake Store API
 FAKE_STORE_API_BASE_URL = "https://fakestoreapi.com"
@@ -67,7 +67,9 @@ if __name__ == "__main__":
     # Crear tablas
     DecBase.metadata.create_all(bind=engine)
     
-    db = SessionLocal()
+     # Usar get_db() como generador
+    db_generator = get_db()
+    db = next(db_generator)
     try:
         for config in ENDPOINTS_CONFIG:
             data = get_items_model(config["url"])
@@ -81,4 +83,7 @@ if __name__ == "__main__":
                 logger.error(f"❌ No se pudieron obtener {config['name']}")
                 
     finally:
-        db.close()
+        try:
+            next(db_generator)  
+        except StopIteration:
+            pass
