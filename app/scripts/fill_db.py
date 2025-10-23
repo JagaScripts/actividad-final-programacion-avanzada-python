@@ -1,53 +1,84 @@
+from datetime import datetime
 import requests
-
-from sqlalchemy.orm import Session
-
-# Importar los modelos y la configuración de la base de datos
-from app.core.database import SessionLocal, engine, Base
+import logging
+from sqlalchemy.orm import Session 
+from app.models.cart_model import CartItem
 from app.models.user_model import User
 from app.models.product_model import Product
-from app.models.cart_model import CartItem
+from app.models.dec_base import DecBase
+from app.core.database import SessionLocal, engine
 
-# URLs de la Fake Store API
-FAKESTORE_API_URL_PRODUCTS = "https://fakestoreapi.com/products"
-FAKESTORE_API_URL_USERS = "https://fakestoreapi.com/users"    
-FAKESTORE_API_URL_CARTS = "https://fakestoreapi.com/carts" 
+# Constantes para la Fake Store API
+FAKE_STORE_API_BASE_URL = "https://fakestoreapi.com"
 
-def fetch_data_from_api(url: str):
-    response = requests.get(url)
-    response.raise_for_status()
-    return response.json()
 
-def create_tables():
-    Base.metadata.create_all(bind=engine)
+# Definir los endpoints y sus modelos correspondientes
+ENDPOINTS_CONFIG = [
+    {
+        "url": f"{FAKE_STORE_API_BASE_URL}/products",
+        "model": Product,
+        "name": "products"
+    },
+    {
+        "url": f"{FAKE_STORE_API_BASE_URL}/users" , 
+        "model": User,
+        "name": "users"
+    },
+    {
+        "url": f"{FAKE_STORE_API_BASE_URL}/carts",
+        "model": CartItem,
+        "name": "carts"
+    }
+]
 
-def fill_database():
-    db = SessionLocal()
+# Configuración de logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("fakestore")
+
+def get_items_model(model_url):
     try:
-        # Obtener datos de la API y llenar la base de datos
-        products = fetch_data_from_api(FAKESTORE_API_URL_PRODUCTS)
-        users = fetch_data_from_api(FAKESTORE_API_URL_USERS)
-        carts = fetch_data_from_api(FAKESTORE_API_URL_CARTS)
+        response = requests.get(model_url)
+        response.raise_for_status()
+        return response.json()
+    except requests.HTTPError as e:
+        logger.error(f"Error al obtener datos de {model_url}: {e}")
+        return None
+    except requests.RequestException as e:
+        logger.error(f"Error de conexión con {model_url}: {e}")
+        return None
 
-        # Llenar la tabla de productos
-        for product in products:
-            db.add(Product(**product))
-
-        # Llenar la tabla de usuarios
-        for user in users:
-            db.add(User(**user))
-
-        # Llenar la tabla de carritos
-        for cart in carts:
-            db.add(CartItem(**cart))
-
+def insert_data_generic(db: Session, data_list: list, model_class):
+    try:
+        # Convertir fechas strings a objetos datetime
+        for data in data_list:
+            if 'date' in data and isinstance(data['date'], str):
+                data['date'] = datetime.fromisoformat(data['date'].replace('Z', '+00:00'))
+        
+        db.bulk_insert_mappings(model_class, data_list)
         db.commit()
+        logger.info(f"Datos insertados en {model_class.__tablename__}: {len(data_list)} registros")
+        return True
     except Exception as e:
         db.rollback()
-        print(f"Error al llenar la base de datos: {e}")
-    finally:
-        db.close()
+        logger.error(f"Error al insertar datos en {model_class.__tablename__}: {e}")
+        return False
 
 if __name__ == "__main__":
-    create_tables()
-    fill_database()
+    # Crear tablas
+    DecBase.metadata.create_all(bind=engine)
+    
+    db = SessionLocal()
+    try:
+        for config in ENDPOINTS_CONFIG:
+            data = get_items_model(config["url"])
+            if data:
+                success = insert_data_generic(db, data, config["model"])
+                if success:
+                    logger.info(f"✅ {config['name']} insertados correctamente")
+                else:
+                    logger.error(f"❌ Error insertando {config['name']}")
+            else:
+                logger.error(f"❌ No se pudieron obtener {config['name']}")
+                
+    finally:
+        db.close()
