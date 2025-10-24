@@ -1,8 +1,8 @@
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
 
 class UserBase(BaseModel):
-    email: EmailStr = Field(..., description="User email")
+    email: str = Field(..., description="User email")
     username: str = Field(..., min_length=3, max_length=50, description="Username")
 
 class UserCreate(UserBase):
@@ -12,7 +12,7 @@ class UserCreate(UserBase):
     phone: str = Field(..., description="Phone number")
 
 class UserUpdate(BaseModel):
-    email: Optional[EmailStr] = Field(None, description="User email")
+    email: Optional[str] = Field(None, description="User email")
     username: Optional[str] = Field(None, min_length=3, max_length=50, description="Username")
     password: Optional[str] = Field(None, min_length=6, description="User password")
     name: Optional[Dict[str, str]] = Field(None, description="First and last name")
