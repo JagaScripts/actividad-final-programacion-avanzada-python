@@ -6,7 +6,7 @@ from app.models.cart_model import CartItem
 from app.models.user_model import User
 from app.models.product_model import Product
 from app.models.dec_base import DecBase
-from app.core.database import SessionLocal, engine, get_db
+from app.core.database import engine, get_db
 
 # Constantes para la Fake Store API
 FAKE_STORE_API_BASE_URL = "https://fakestoreapi.com"
@@ -33,7 +33,7 @@ ENDPOINTS_CONFIG = [
 
 # Configuración de logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("fakestore")
+logger = logging.getLogger("jagastore")
 
 def get_items_model(model_url):
     try:

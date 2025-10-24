@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./app/core/fakestore.db"
+SQLALCHEMY_DATABASE_URL = "sqlite:///./app/core/jagastore.db"
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
