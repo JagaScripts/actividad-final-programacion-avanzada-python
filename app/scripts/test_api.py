@@ -103,6 +103,18 @@ def test_endpoint(method, endpoint, expected_status, json_data=None, description
         logger.error(f"❌ EXCEPTION: {e}")
         raise
 
+def stop_server():
+    """Detener el servidor después de los tests"""
+    try:
+        logger.info("🛑 Deteniendo servidor...")
+        # En Linux/Mac
+        subprocess.run(["pkill", "-f", "uvicorn"], capture_output=True)
+        # En Windows (comentado por si acaso)
+        # subprocess.run(["taskkill", "/f", "/im", "python.exe"], capture_output=True)
+        logger.info("✅ Servidor detenido")
+    except Exception as e:
+        logger.error(f"❌ Error deteniendo servidor: {e}")
+
 def run_tests():
     """Ejecutar todos los tests con asserts"""
     logger.info("🚀 Iniciando tests de la API JaGaStore")
@@ -217,6 +229,8 @@ def run_tests():
                                               description="Actualizar usuario no existente")
 
         logger.info("🎉 ¡Todos los tests pasaron correctamente!")
+
+        stop_server()
         
     except Exception as e:
         logger.error(f"💥 Tests fallaron: {e}")
