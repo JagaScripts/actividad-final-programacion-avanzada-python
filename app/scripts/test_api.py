@@ -1,6 +1,9 @@
 import requests
 import logging
 import time
+import subprocess
+import sys
+import os
 
 BASE_URL = "http://localhost:8000"
 HEADERS = {"Content-Type": "application/json"}
@@ -8,6 +11,70 @@ HEADERS = {"Content-Type": "application/json"}
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+def check_and_create_database():
+    """Verificar y crear base de datos si no existe"""
+    db_path = "app/core/jagastore.db"
+    
+    if not os.path.exists(db_path):
+        logger.info("🔄 Base de datos no encontrada, creándola...")
+        try:
+            # Ejecutar fill_db.py para crear y poblar la BD
+            result = subprocess.run([
+                sys.executable, "app/scripts/fill_db.py"
+            ], capture_output=True, text=True, cwd=os.getcwd())
+            
+            if result.returncode == 0:
+                logger.info("✅ Base de datos creada y poblada exitosamente")
+                return True
+            else:
+                logger.error(f"❌ Error creando base de datos: {result.stderr}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Error ejecutando fill_db.py: {e}")
+            return False
+    else:
+        logger.info("✅ Base de datos encontrada")
+        return True
+
+# Método para iniciar el servidor si no está corriendo
+def start_server_if_needed():
+    try:
+        response = requests.get(f"{BASE_URL}/health", timeout=5)
+        if response.status_code == 200:
+            logger.info("✅ Servidor ya está en marcha")
+            return True
+    except requests.exceptions.ConnectionError:
+        logger.info("🔄 Servidor no detectado, iniciando...")
+        try:
+            # Ejecutar uvicorn en segundo plano
+            subprocess.Popen([
+                sys.executable, "-m", "uvicorn", 
+                "app.main:app", 
+                "--reload", 
+                "--host", "0.0.0.0", 
+                "--port", "8000"
+            ])
+            logger.info("⏳ Esperando a que el servidor inicie...")
+            time.sleep(5)
+            
+            # Verificar que arrancó
+            for _ in range(10):
+                try:
+                    response = requests.get(f"{BASE_URL}/health", timeout=5)
+                    if response.status_code == 200:
+                        logger.info("✅ Servidor iniciado correctamente")
+                        return True
+                except:
+                    time.sleep(2)
+            
+            logger.error("❌ No se pudo iniciar el servidor")
+            return False
+            
+        except Exception as e:
+            logger.error(f"❌ Error iniciando servidor: {e}")
+            return False
 
 # Metodo genérico para testear un endpoint
 def test_endpoint(method, endpoint, expected_status, json_data=None, description=""):
@@ -40,8 +107,15 @@ def run_tests():
     """Ejecutar todos los tests con asserts"""
     logger.info("🚀 Iniciando tests de la API JaGaStore")
     
-    # Esperar a que la API esté lista
-    time.sleep(2)
+    # Verificar/crear base de datos
+    if not check_and_create_database():
+        logger.error("No se puede ejecutar tests - problema con la base de datos")
+        return
+
+    # Iniciar servidor si es necesario
+    if not start_server_if_needed():
+        logger.error("No se puede ejecutar tests - servidor no disponible")
+        return
     
     try:
         # 1. Test endpoints GET (lectura)
@@ -123,7 +197,25 @@ def run_tests():
         
         # Producto no existente  
         test_endpoint("GET", "/products/999", 404, description="Producto no existente")
-        
+
+        # Test 400 - Datos faltantes
+        test_endpoint("POST", "/users/", 422,
+                                              json_data={"email": "test@example.com"},  # Faltan campos
+                                              description="Datos incompletos")
+
+        # Test 404 - Recurso no existente
+        test_endpoint("GET", "/users/9999", 404,
+                                              description="Usuario no existente")
+
+        # Test DELETE no existente
+        test_endpoint("DELETE", "/users/9999", 404,
+                                              description="Eliminar usuario no existente")
+
+        # Test PUT no existente
+        test_endpoint("PUT", "/users/9999", 404,
+                                              json_data={"phone": "123456789"},
+                                              description="Actualizar usuario no existente")
+
         logger.info("🎉 ¡Todos los tests pasaron correctamente!")
         
     except Exception as e:
