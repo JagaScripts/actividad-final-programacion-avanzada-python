@@ -3,14 +3,14 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 
 class CartBase(BaseModel):
-    user_id: int = Field(..., gt=0, description="User ID")
+    userId: int = Field(..., gt=0, description="User ID")
     date: datetime = Field(..., description="Cart date")
 
 class CartCreate(CartBase):
     products: List[Dict[str, Any]] = Field(..., description="List of products with quantities")
 
 class CartUpdate(BaseModel):
-    user_id: Optional[int] = Field(None, gt=0, description="User ID")
+    userId: Optional[int] = Field(None, gt=0, description="User ID")
     date: Optional[datetime] = Field(None, description="Cart date")
     products: Optional[List[Dict[str, Any]]] = Field(None, description="List of products with quantities")
 
